@@ -1,21 +1,55 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Button, StyleSheet } from "react-native";
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 
 const RouteDetails = ({ route, navigation }) => {
   const { routeId } = route.params;
   const [routeDetails, setRouteDetails] = useState(null);
 
   useEffect(() => {
+    // Check network status and load data accordingly
+    const loadRoute = async () => {
+      const storedRoute = await AsyncStorage.getItem(`route_${routeId}`);
+      const networkState = await NetInfo.fetch();
+
+      if (networkState.isConnected) {
+        // If connected to the internet, fetch data from server
+        fetchRouteFromServer();
+      } else if (storedRoute) {
+        // If offline, load from AsyncStorage
+        setRouteDetails(JSON.parse(storedRoute));
+      } else {
+        console.error(
+          "No internet connection and no stored route data available."
+        );
+      }
+    };
+
+    loadRoute();
+  }, [routeId]);
+
+  const fetchRouteFromServer = () => {
     axios
-      .get(`http://192.168.18.11:3000/routes/${routeId}`)
+      .get(`http://192.168.227.98:3000/routes/${routeId}`)
       .then((response) => {
         setRouteDetails(response.data);
+        saveRouteToLocal(response.data); // Save data locally for offline access
       })
       .catch((error) => {
         console.error("Error fetching route details:", error);
       });
-  }, [routeId]);
+  };
+
+  const saveRouteToLocal = async (data) => {
+    try {
+      await AsyncStorage.setItem(`route_${routeId}`, JSON.stringify(data));
+      console.log("Route saved locally");
+    } catch (error) {
+      console.error("Failed to save route: ", error);
+    }
+  };
 
   if (!routeDetails) {
     return <Text>Loading...</Text>;
