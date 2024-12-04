@@ -1,6 +1,7 @@
-// RouteDetails.js
+// screens/RouteDetails.js
 
 import React, { useEffect, useState } from "react";
+import * as Speech from "expo-speech";
 import {
   View,
   Text,
@@ -17,13 +18,28 @@ import NetInfo from "@react-native-community/netinfo";
 const RouteDetails = ({ route, navigation }) => {
   const { routeId } = route.params;
   const [routeDetails, setRouteDetails] = useState(null);
-  const [error, setError] = useState(null); // Added error state
-  const [arrivedWaypoints, setArrivedWaypoints] = useState([]); // Track arrived waypoints
+  const [error, setError] = useState(null); // Stan błędu
+  const [arrivedWaypoints, setArrivedWaypoints] = useState([]); // Śledzenie odwiedzonych punktów
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // URL Twojego serwera backendowego
+  const SERVER_URL = "http://192.168.18.11:3000"; // Zmień na odpowiedni adres IP lub domenę
+
+  useEffect(() => {
+    // Inicjalizacja Speech
+    // expo-speech nie ma metod setDefaultLanguage, setDefaultRate, setDefaultPitch
+    // Zamiast tego, przekazuj te opcje bezpośrednio w Speech.speak
+
+    return () => {
+      // Zatrzymaj odtwarzanie Speech przy odmontowaniu komponentu
+      Speech.stop();
+    };
+  }, []);
 
   useEffect(() => {
     const loadRoute = async () => {
       try {
-        const storedRoute = await AsyncStorage.getItem(`route_${routeId}`); // Corrected string interpolation
+        const storedRoute = await AsyncStorage.getItem(`route_${routeId}`);
         const networkState = await NetInfo.fetch();
 
         if (networkState.isConnected) {
@@ -33,12 +49,12 @@ const RouteDetails = ({ route, navigation }) => {
           initializeArrivedWaypoints(JSON.parse(storedRoute));
         } else {
           setError(
-            "No internet connection and no stored route data available."
+            "Brak połączenia internetowego i danych trasy w pamięci podręcznej."
           );
         }
       } catch (err) {
         console.error("Error loading route:", err);
-        setError("An unexpected error occurred.");
+        setError("Wystąpił nieoczekiwany błąd.");
       }
     };
 
@@ -47,15 +63,15 @@ const RouteDetails = ({ route, navigation }) => {
 
   const fetchRouteFromServer = () => {
     axios
-      .get(`http://192.168.18.11:3000/routes/${routeId}`) // Use 'localhost' if testing on emulator; adjust accordingly for physical devices
+      .get(`${SERVER_URL}/routes/${routeId}`)
       .then((response) => {
         setRouteDetails(response.data);
-        saveRouteToLocal(response.data); // Save data locally for offline access
+        saveRouteToLocal(response.data); // Zapisz dane lokalnie dla dostępu offline
         initializeArrivedWaypoints(response.data);
       })
       .catch((error) => {
         console.error("Error fetching route details:", error);
-        setError("Failed to fetch route details.");
+        setError("Nie udało się pobrać szczegółów trasy.");
       });
   };
 
@@ -65,54 +81,71 @@ const RouteDetails = ({ route, navigation }) => {
 
   const saveRouteToLocal = async (data) => {
     try {
-      await AsyncStorage.setItem(`route_${routeId}`, JSON.stringify(data)); // Corrected string interpolation
-      console.log("Route saved locally");
+      await AsyncStorage.setItem(`route_${routeId}`, JSON.stringify(data));
+      console.log("Trasa zapisana lokalnie");
     } catch (error) {
-      console.error("Failed to save route: ", error);
+      console.error("Nie udało się zapisać trasy: ", error);
     }
   };
 
-  // Function to open Google Maps for navigation
+  // Funkcja do otwierania Google Maps dla nawigacji
   const openInGoogleMaps = (latitude, longitude) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`; // Corrected string interpolation
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`;
     Linking.openURL(url).catch((err) =>
-      console.error("Failed to open Google Maps:", err)
+      console.error("Nie udało się otworzyć Google Maps:", err)
     );
   };
 
-  // Function to simulate arrival at the next waypoint
+  // Funkcja do symulacji przyjazdu do następnego punktu
   const simulateArrival = () => {
     if (!routeDetails || !routeDetails.waypoints) return;
 
-    // Find the index of the first waypoint that hasn't been arrived at
+    // Znajdź indeks pierwszego nieodwiedzonego punktu
     const nextIndex = arrivedWaypoints.findIndex((arrived) => !arrived);
 
     if (nextIndex === -1) {
-      Alert.alert("All waypoints have been arrived at.");
+      Alert.alert("You arrived to all places on this route.");
       return;
     }
 
-    // Get the waypoint details
+    // Pobierz szczegóły punktu
     const waypoint = routeDetails.waypoints[nextIndex];
 
-    // Update the arrivedWaypoints state
+    // Zaktualizuj stan punktów jako odwiedzonych
     const updatedArrivedWaypoints = [...arrivedWaypoints];
     updatedArrivedWaypoints[nextIndex] = true;
     setArrivedWaypoints(updatedArrivedWaypoints);
 
-    // Display the waypoint description
+    // Odtwórz opis punktu za pomocą Speech
+    setIsSpeaking(true);
+    Speech.stop(); // Zatrzymaj ewentualne trwające odtwarzanie
+    Speech.speak(waypoint.description, {
+      language: "en-US", // Ustaw język na polski
+      rate: 1, // Ustaw prędkość mówienia
+      pitch: 1.0, // Ustaw ton mowy
+      onDone: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false),
+    });
+
+    // Opcjonalnie: Wyświetl alert z opisem
     Alert.alert(
-      `Arrived at ${waypoint.name}`,
+      `You arrived to ${waypoint.name}`,
       waypoint.description,
       [{ text: "OK" }],
       { cancelable: false }
     );
   };
 
+  // Funkcja do zatrzymywania Speech
+  const stopSpeech = () => {
+    Speech.stop();
+    setIsSpeaking(false);
+  };
+
   if (!routeDetails && !error) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading route details...</Text>
+        <Text>Loading details of a route...</Text>
       </View>
     );
   }
@@ -139,18 +172,18 @@ const RouteDetails = ({ route, navigation }) => {
         </Text>
 
         <Button
-          title="View Entire Route on Map"
+          title="View Route on Map"
           onPress={() =>
             navigation.navigate("MapScreen", {
               start: routeDetails.start,
               end: routeDetails.end,
               waypoints: routeDetails.waypoints,
-              arrivedWaypoints: arrivedWaypoints, // Pass arrivedWaypoints to MapScreen
+              arrivedWaypoints: arrivedWaypoints, // Przekaż arrivedWaypoints do MapScreen
             })
           }
         />
 
-        <Text style={styles.waypointsTitle}>Waypoints:</Text>
+        <Text style={styles.waypointsTitle}>Punkty Pośrednie:</Text>
         {Array.isArray(routeDetails.waypoints) &&
         routeDetails.waypoints.length > 0 ? (
           routeDetails.waypoints.map((waypoint, index) => (
@@ -168,7 +201,7 @@ const RouteDetails = ({ route, navigation }) => {
                   openInGoogleMaps(waypoint.latitude, waypoint.longitude)
                 }
               />
-              {/* Optional: Indicate if the waypoint has been arrived at */}
+              {/* Opcjonalnie: Wskaźnik, czy punkt został odwiedzony */}
               {arrivedWaypoints[index] && (
                 <Text style={styles.arrivedText}>Arrived</Text>
               )}
@@ -197,8 +230,18 @@ const RouteDetails = ({ route, navigation }) => {
           }
         />
         <View style={styles.simulateButtonContainer}>
-          <Button title="Simulate Arrival" onPress={simulateArrival} />
+          <Button title="Simulate Arriving" onPress={simulateArrival} />
         </View>
+        {/* Przycisk do zatrzymywania Speech */}
+        {isSpeaking && (
+          <View style={styles.controlButtonContainer}>
+            <Button title="Stop Audio" onPress={stopSpeech} />
+          </View>
+        )}
+        {/* Wskaźnik odtwarzania */}
+        {isSpeaking && (
+          <Text style={styles.speakingIndicator}>Audio playing...</Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -223,6 +266,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  controlButtonContainer: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  speakingIndicator: {
+    color: "green",
+    fontStyle: "italic",
+    marginTop: 10,
+    marginBottom: 10,
   },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 10 },
   subtitle: { fontSize: 18, marginVertical: 5 },
