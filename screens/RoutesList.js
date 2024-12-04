@@ -14,7 +14,7 @@ const RoutesList = ({ navigation }) => {
   useEffect(() => {
     // Pobieranie listy tras z serwera
     axios
-      .get("http://192.168.227.98:3000/routes") // Upewnij się, że adres serwera jest poprawny
+      .get("http://192.168.18.11:3000/routes") // Upewnij się, że adres serwera jest poprawny
       .then((response) => {
         setRoutes(response.data);
       })
