@@ -13,22 +13,22 @@ const AppNavigator = () => (
     <Stack.Screen
       name="RoutesList"
       component={RoutesList}
-      options={{ title: "Wybierz Trasę" }}
+      options={{ title: "Choose Route" }}
     />
     <Stack.Screen
       name="RouteDetails"
       component={RouteDetails}
-      options={{ title: "Szczegóły Trasy" }}
+      options={{ title: "Route Details" }}
     />
     <Stack.Screen
       name="NavigationScreen"
       component={NavigationScreen}
-      options={{ title: "Nawigacja" }}
+      options={{ title: "Navigation" }}
     />
     <Stack.Screen
       name="MapScreen"
       component={MapScreen} // Add MapScreen to the stack
-      options={{ title: "Mapa" }}
+      options={{ title: "Map" }}
     />
   </Stack.Navigator>
 );

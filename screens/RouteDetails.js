@@ -183,7 +183,7 @@ const RouteDetails = ({ route, navigation }) => {
           }
         />
 
-        <Text style={styles.waypointsTitle}>Punkty Pośrednie:</Text>
+        <Text style={styles.waypointsTitle}>Waypoints:</Text>
         {Array.isArray(routeDetails.waypoints) &&
         routeDetails.waypoints.length > 0 ? (
           routeDetails.waypoints.map((waypoint, index) => (
